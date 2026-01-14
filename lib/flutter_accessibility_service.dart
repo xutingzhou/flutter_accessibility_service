@@ -53,6 +53,19 @@ class FlutterAccessibilityService {
     }
   }
 
+  static Future<bool> click(double x, double y) async {
+    try {
+      final bool? success = await _methodChannel.invokeMethod('click', {
+        'x': x,
+        'y': y,
+      });
+      return success ?? false;
+    } on PlatformException catch (e) {
+      log("Gesture click failed: ${e.message}");
+      return false;
+    }
+  }
+
   /// An action that can be performed on an `AccessibilityNodeInfo` by nodeId
   /// pass the necessary arguments depends on each action to avoid any errors
   /// See more: https://developer.android.com/reference/android/view/accessibility/AccessibilityNodeInfo.AccessibilityAction

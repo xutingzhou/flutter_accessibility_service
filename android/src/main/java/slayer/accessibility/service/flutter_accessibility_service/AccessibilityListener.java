@@ -21,12 +21,12 @@ import android.view.accessibility.AccessibilityWindowInfo;
 
 import androidx.annotation.RequiresApi;
 
-
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.HashSet;
 import java.util.stream.Collectors;
 
@@ -34,17 +34,24 @@ import io.flutter.embedding.android.FlutterTextureView;
 import io.flutter.embedding.android.FlutterView;
 import io.flutter.embedding.engine.FlutterEngineCache;
 
-
 public class AccessibilityListener extends AccessibilityService {
+
     private static WindowManager mWindowManager;
     private static FlutterView mOverlayView;
     static private boolean isOverlayShown = false;
     private static final int CACHE_SIZE = 4 * 1024 * 1024; // 4Mib
     private static final int maxDepth = 20;
-    private static LruCache<String, AccessibilityNodeInfo> nodeMap =
-            new LruCache<>(CACHE_SIZE);
+    private static LruCache<String, AccessibilityNodeInfo> nodeMap
+            = new LruCache<>(CACHE_SIZE);
+    private static final Map<String, AccessibilityNodeInfo> nodeCache = new HashMap<>();
     private static final int DEFAULT_MAX_TREE_DEPTH = 15;
     private int maximumTreeDepth = DEFAULT_MAX_TREE_DEPTH;
+
+    private static AccessibilityListener instance;
+
+    public static AccessibilityListener getInstance() {
+        return instance;
+    }
 
     public static AccessibilityNodeInfo getNodeInfo(String id) {
         return nodeMap.get(id);
@@ -71,7 +78,6 @@ public class AccessibilityListener extends AccessibilityService {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 windowInfo = parentNodeInfo.getWindow();
             }
-
 
             Intent intent = new Intent(ACCESSIBILITY_INTENT);
 
@@ -138,7 +144,6 @@ public class AccessibilityListener extends AccessibilityService {
         return START_STICKY;
     }
 
-
     @RequiresApi(api = Build.VERSION_CODES.N)
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     void getSubNodes(AccessibilityNodeInfo node, List<HashMap<String, Object>> arr, HashSet<AccessibilityNodeInfo> traversedNodes, int currentDepth) {
@@ -149,7 +154,9 @@ public class AccessibilityListener extends AccessibilityService {
             return;
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-            if (traversedNodes.contains(node)) return;
+            if (traversedNodes.contains(node)) {
+                return;
+            }
             traversedNodes.add(node);
             String mapId = generateNodeId(node);
             AccessibilityWindowInfo windowInfo = null;
@@ -177,8 +184,9 @@ public class AccessibilityListener extends AccessibilityService {
             storeNode(mapId, node);
             for (int i = 0; i < node.getChildCount(); i++) {
                 AccessibilityNodeInfo child = node.getChild(i);
-                if (child == null)
+                if (child == null) {
                     continue;
+                }
                 getSubNodes(child, arr, traversedNodes, currentDepth + 1);
             }
         }
@@ -195,10 +203,10 @@ public class AccessibilityListener extends AccessibilityService {
         return frame;
     }
 
-
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP_MR1)
     @Override
     protected void onServiceConnected() {
+        instance = this;
         mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         mOverlayView = new FlutterView(getApplicationContext(), new FlutterTextureView(getApplicationContext()));
         mOverlayView.attachToFlutterEngine(FlutterEngineCache.getInstance().get(CACHED_TAG));
@@ -206,6 +214,12 @@ public class AccessibilityListener extends AccessibilityService {
         mOverlayView.setFocusable(true);
         mOverlayView.setFocusableInTouchMode(true);
         mOverlayView.setBackgroundColor(Color.TRANSPARENT);
+    }
+
+    @Override
+    public boolean onUnbind(Intent intent) {
+        instance = null;
+        return super.onUnbind(intent);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP_MR1)
@@ -219,8 +233,8 @@ public class AccessibilityListener extends AccessibilityService {
             if (!clickableThrough) {
                 lp.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
             } else {
-                lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+                lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
             }
             lp.gravity = gravity;
             mWindowManager.addView(mOverlayView, lp);
@@ -237,6 +251,7 @@ public class AccessibilityListener extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        instance = null;
         super.onDestroy();
         removeOverlay();
         SharedPreferences sharedPreferences = getSharedPreferences(SHARED_PREFS_TAG, MODE_PRIVATE);
@@ -247,7 +262,6 @@ public class AccessibilityListener extends AccessibilityService {
     @Override
     public void onInterrupt() {
     }
-
 
     private String generateNodeId(AccessibilityNodeInfo node) {
         return node.getWindowId() + "_" + node.getClassName() + "_" + node.getText() + "_" + node.getContentDescription(); //UUID.randomUUID().toString();

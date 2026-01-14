@@ -14,6 +14,9 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.accessibilityservice.GestureDescription;
+import android.graphics.Path;
+import android.os.Build;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
@@ -41,11 +44,9 @@ import io.flutter.plugin.common.PluginRegistry;
  */
 public class FlutterAccessibilityServicePlugin implements FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.ActivityResultListener, EventChannel.StreamHandler {
 
-
     private static final String CHANNEL_TAG = "x-slayer/accessibility_channel";
     private static final String EVENT_TAG = "x-slayer/accessibility_event";
     public static final String CACHED_TAG = "cashedAccessibilityEngine";
-
 
     private MethodChannel channel;
     private AccessibilityReceiver accessibilityReceiver;
@@ -73,7 +74,6 @@ public class FlutterAccessibilityServicePlugin implements FlutterPlugin, Activit
             pendingResult.success(actions);
         }
     };
-
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
@@ -110,6 +110,17 @@ public class FlutterAccessibilityServicePlugin implements FlutterPlugin, Activit
                 result.success(true);
             } else {
                 result.success(false);
+            }
+        } else if (call.method.equals("click")) {
+            // 获取 Flutter 传过来的坐标
+            Double x = call.argument("x");
+            Double y = call.argument("y");
+
+            if (x != null && y != null) {
+                boolean success = clickAt(x.floatValue(), y.floatValue());
+                result.success(success);
+            } else {
+                result.error("INVALID_ARGUMENTS", "Coordinates cannot be null", null);
             }
         } else if (call.method.equals("performActionById")) {
             String nodeId = call.argument("nodeId");
@@ -148,6 +159,24 @@ public class FlutterAccessibilityServicePlugin implements FlutterPlugin, Activit
         } else {
             result.notImplemented();
         }
+    }
+
+    private boolean clickAt(float x, float y) {
+        AccessibilityListener service = AccessibilityListener.getInstance();
+        if (service == null) {
+            return false;
+        }
+
+        Path path = new Path();
+        path.moveTo(x, y);
+        // 模拟微小的斜向滑动，增加 5 像素位移
+        path.lineTo(x + 5, y + 5);
+
+        GestureDescription.Builder builder = new GestureDescription.Builder();
+        // 增加持续时间到 200ms
+        builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 200));
+
+        return service.dispatchGesture(builder.build(), null, null);
     }
 
     @Override
