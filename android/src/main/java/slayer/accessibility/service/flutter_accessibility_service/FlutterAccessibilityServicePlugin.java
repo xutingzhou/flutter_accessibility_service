@@ -122,6 +122,19 @@ public class FlutterAccessibilityServicePlugin implements FlutterPlugin, Activit
             } else {
                 result.error("INVALID_ARGUMENTS", "Coordinates cannot be null", null);
             }
+        } else if (call.method.equals("swipe")) {
+            Double x1 = call.argument("x1");
+            Double y1 = call.argument("y1");
+            Double x2 = call.argument("x2");
+            Double y2 = call.argument("y2");
+            Integer duration = call.argument("duration");
+
+            if (x1 != null && y1 != null && x2 != null && y2 != null) {
+                boolean success = performSwipe(x1.floatValue(), y1.floatValue(),
+                        x2.floatValue(), y2.floatValue(),
+                        duration != null ? duration : 300);
+                result.success(success);
+            }
         } else if (call.method.equals("performActionById")) {
             String nodeId = call.argument("nodeId");
             Integer action = (Integer) call.argument("nodeAction");
@@ -175,6 +188,22 @@ public class FlutterAccessibilityServicePlugin implements FlutterPlugin, Activit
         GestureDescription.Builder builder = new GestureDescription.Builder();
         // 增加持续时间到 200ms
         builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 200));
+
+        return service.dispatchGesture(builder.build(), null, null);
+    }
+
+    private boolean performSwipe(float x1, float y1, float x2, float y2, int duration) {
+        AccessibilityListener service = AccessibilityListener.getInstance();
+        if (service == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return false;
+        }
+
+        Path path = new Path();
+        path.moveTo(x1, y1);
+        path.lineTo(x2, y2); // 简单的直线滑动，如需曲线可使用 quadTo
+
+        GestureDescription.Builder builder = new GestureDescription.Builder();
+        builder.addStroke(new GestureDescription.StrokeDescription(path, 0, duration));
 
         return service.dispatchGesture(builder.build(), null, null);
     }

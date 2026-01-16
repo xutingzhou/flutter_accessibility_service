@@ -66,6 +66,21 @@ class FlutterAccessibilityService {
     }
   }
 
+  static Future<bool> swipe(double x1, double y1, double x2, double y2,
+      {int duration = 300}) async {
+    try {
+      return await _methodChannel.invokeMethod('swipe', {
+        'x1': x1,
+        'y1': y1,
+        'x2': x2,
+        'y2': y2,
+        'duration': duration,
+      });
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// An action that can be performed on an `AccessibilityNodeInfo` by nodeId
   /// pass the necessary arguments depends on each action to avoid any errors
   /// See more: https://developer.android.com/reference/android/view/accessibility/AccessibilityNodeInfo.AccessibilityAction
